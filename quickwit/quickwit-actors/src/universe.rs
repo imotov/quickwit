@@ -23,7 +23,7 @@ use crate::mailbox::create_mailbox;
 use crate::registry::ActorObservation;
 use crate::scheduler::start_scheduler;
 use crate::spawn_builder::{SpawnBuilder, SpawnContext};
-use crate::{Actor, Command, Inbox, Mailbox, QueueCapacity};
+use crate::{Actor, Command, Inbox, Mailbox, QueueCapacity, ActorExitStatus};
 
 /// Universe serves as the top-level context in which Actor can be spawned.
 /// It is *not* a singleton. A typical application will usually have only one universe hosting all
@@ -116,6 +116,12 @@ impl Universe {
     ) -> Result<(), crate::SendError> {
         mailbox.send_message(Command::ExitWithSuccess).await?;
         Ok(())
+    }
+
+    /// Gracefully quits all actors, regardless of whether there are pending messages or not.
+    /// Its finalize function will be called.
+    pub async fn quit(&self) -> Vec<ActorExitStatus> {
+        self.spawn_ctx.registry.quit().await
     }
 }
 
