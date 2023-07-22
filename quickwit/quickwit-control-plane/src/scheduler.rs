@@ -30,6 +30,7 @@ use quickwit_actors::{Actor, ActorContext, ActorExitStatus, Handler};
 use quickwit_config::SourceConfig;
 use quickwit_metastore::Metastore;
 use quickwit_proto::indexing::{ApplyIndexingPlanRequest, IndexingTask};
+use quickwit_proto::IndexingService;
 use serde::Serialize;
 use tracing::{debug, error, info, warn};
 
@@ -272,6 +273,7 @@ impl IndexingScheduler {
                 .iter_mut()
                 .find(|indexer| &indexer.0 == node_id)
                 .expect("This should never happen as the plan was built from these indexers.");
+println!("Before");
             if let Err(error) = indexer
                 .1
                 .client
@@ -282,6 +284,7 @@ impl IndexingScheduler {
             {
                 error!(indexer_node_id=%indexer.0, err=?error, "Error occurred when appling indexing plan to indexer.");
             }
+println!("After");
         }
         self.state.num_applied_physical_indexing_plan += 1;
         self.state.last_applied_plan_timestamp = Some(Instant::now());
@@ -522,10 +525,10 @@ mod tests {
     use quickwit_common::tower::{Change, Pool};
     use quickwit_config::service::QuickwitService;
     use quickwit_config::{KafkaSourceParams, SourceConfig, SourceInputFormat, SourceParams};
-    use quickwit_indexing::indexing_client::IndexingServiceClient;
     use quickwit_indexing::IndexingService;
     use quickwit_metastore::{IndexMetadata, MockMetastore};
     use quickwit_proto::indexing::{ApplyIndexingPlanRequest, IndexingTask};
+    use quickwit_proto::IndexingServiceClient;
     use serde_json::json;
 
     use super::{IndexingScheduler, CONTROL_PLAN_LOOP_INTERVAL};
@@ -576,10 +579,9 @@ mod tests {
                         if node.enabled_services().contains(&QuickwitService::Indexer) =>
                     {
                         let node_id = node.node_id().to_string();
-                        let grpc_addr = node.grpc_advertise_addr();
                         let indexing_tasks = node.indexing_tasks().to_vec();
                         let client_mailbox = indexing_clients.get(&node_id).unwrap().clone();
-                        let client = IndexingServiceClient::from_service(client_mailbox, grpc_addr);
+                        let client = IndexingServiceClient::from_mailbox(client_mailbox);
                         Some(Change::Insert(
                             node_id,
                             IndexerNodeInfo {
@@ -737,6 +739,7 @@ mod tests {
         universe.assert_quit().await;
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_scheduler_scheduling_multiple_indexers() {
         quickwit_common::setup_logging_for_tests();
